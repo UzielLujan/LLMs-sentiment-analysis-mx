@@ -21,6 +21,8 @@ __pycache__/
 
 # Data files - Descomentar si los datos son muy grandes para Git
 data/*.csv
+data/*.json
+data/*.xlsx
 
 # Trained models - Nunca subir modelos a Git
 models/
