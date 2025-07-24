@@ -20,9 +20,8 @@ __pycache__/
 .DS_Store
 
 # Data files - Descomentar si los datos son muy grandes para Git
-data/*.csv
-data/*.json
-data/*.xlsx
+#data/*.csv
+#data/*.xlsx
 
 # Trained models - Nunca subir modelos a Git
 models/
