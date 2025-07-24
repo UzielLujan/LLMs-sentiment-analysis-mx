@@ -1,0 +1,36 @@
+# Python/Conda Environments
+/llms-mx-env/
+/ds_env/
+/.env
+/venv/
+/env/
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE and OS specific
+.vscode/
+.idea/
+.DS_Store
+
+# Data files - Descomentar si los datos son muy grandes para Git
+data/*.csv
+
+# Trained models - Nunca subir modelos a Git
+models/
+*.pt
+*.bin
+*.h5
+
+# Logs and results
+logs/
+results/
+
+# Paquetes de Python
+*.egg-info/
