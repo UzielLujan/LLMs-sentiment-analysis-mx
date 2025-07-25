@@ -1,28 +1,13 @@
---- Core Data Science Libraries ---
-These are the main packages for data manipulation, numerical operations, and plotting.
 pandas
 numpy
 scikit-learn
 matplotlib
 seaborn
-
---- NLP & WordCloud Libraries ---
-Specific packages for Natural Language Processing tasks.
 nltk
 wordcloud
-
---- Hugging Face Ecosystem ---
-The core libraries for working with Transformer models.
-We specify recent, stable versions to ensure compatibility.
 transformers>=4.40.0
 datasets>=2.15.0
 accelerate>=0.25.0
-
---- Jupyter & VS Code Integration ---
-These packages allow the environment to work smoothly with notebooks.
 ipykernel
 notebook
-
---- Experiment Tracking ---
-For logging metrics and results.
 wandb
