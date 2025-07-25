@@ -1,11 +1,9 @@
-# src/train.py
-
 import os
 import argparse
 import numpy as np
 import torch
 import wandb
-from datasets import Dataset, Features, ClassLabel, Value
+from datasets import Dataset, Features, ClassLabel
 import transformers
 from transformers import (
     AutoTokenizer,
@@ -50,23 +48,20 @@ def main(args):
     train_dataset = train_dataset.rename_column("polarity_label", "labels")
     eval_dataset = eval_dataset.rename_column("polarity_label", "labels")
 
-    # --- CORRECCIÓN CLAVE AQUÍ ---
-    # Forzamos explícitamente que la columna 'labels' sea del tipo correcto (entero).
-    # Esto resuelve el error "expected scalar type Long but found Float".
     print("Casting label column to correct data type...")
     features = train_dataset.features.copy()
     features['labels'] = ClassLabel(num_classes=len(label_mappings['polarity']))
     train_dataset = train_dataset.cast(features)
     eval_dataset = eval_dataset.cast(features)
-    # --- FIN DE LA CORRECIÓN ---
 
     print(f"Loading tokenizer for model: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
+    # --- CAMBIO CLAVE: Usamos el max_length del argumento ---
     def tokenize_function(examples):
-        return tokenizer(examples['text'], padding="max_length", truncation=True, max_length=512)
+        return tokenizer(examples['text'], padding="max_length", truncation=True, max_length=args.max_length)
 
-    print("Tokenizing datasets...")
+    print(f"Tokenizing datasets with max_length: {args.max_length}...")
     train_dataset = train_dataset.map(tokenize_function, batched=True, remove_columns=['text'])
     eval_dataset = eval_dataset.map(tokenize_function, batched=True, remove_columns=['text'])
 
@@ -142,7 +137,9 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=3, help="Number of training epochs.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per device.")
     parser.add_argument("--learning_rate", type=float, default=2e-5, help="Learning rate for the AdamW optimizer.")
+    parser.add_argument("--max_length", type=int, default=256, help="Maximum sequence length for tokenization.")
     parser.add_argument("--use_wandb", action="store_true", help="Set this flag to enable logging with Weights & Biases.")
     
     args = parser.parse_args()
     main(args)
+
