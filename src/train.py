@@ -57,7 +57,7 @@ def main(args):
     print(f"Loading tokenizer for model: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
-    # --- CAMBIO CLAVE: Usamos el max_length del argumento ---
+    # Define a function to tokenize the datasets with max_length as a parameter
     def tokenize_function(examples):
         return tokenizer(examples['text'], padding="max_length", truncation=True, max_length=args.max_length)
 
@@ -127,7 +127,7 @@ def main(args):
     if args.use_wandb:
         wandb.finish()
     
-    print(f"\n✅ Run '{args.run_name}' completed. Results saved in 'results/' directory.")
+    print(f"\n Run '{args.run_name}' completed. Results saved in 'results/' directory.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a Transformer model for sentiment analysis.")
