@@ -42,7 +42,7 @@ echo "Starting Python training script using 'torchrun' for Distributed Data Para
 # --- THE MAGIC LINE ---
 # Use torchrun to launch 2 processes, one for each GPU in the node.
 # The Trainer will detect this and automatically activate the DDP backend.
-conda run -n llms-mx-env torchrun --nproc_per_node=2 src/train.py \
+conda run -n llms-mx-env torchrun --nproc_per_node=2 src/train_mtl.py \
     --model_name "$MODEL_PATH" \
     --run_name "$RUN_NAME" \
     --epochs "$EPOCHS" \
