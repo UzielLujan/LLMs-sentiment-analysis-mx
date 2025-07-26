@@ -153,7 +153,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=3, help="Number of training epochs.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per device.")
     parser.add_argument("--learning_rate", type=float, default=2e-5, help="Learning rate for the AdamW optimizer.")
-    parser.add_argument("--max_length", type=int, default=128, help="Maximum sequence length for tokenization.")
+    parser.add_argument("--max_length", type=int, default=256, help="Maximum sequence length for tokenization.")
     parser.add_argument("--use_wandb", action="store_true", help="Set this flag to enable logging with Weights & Biases.")
     
     args = parser.parse_args()
