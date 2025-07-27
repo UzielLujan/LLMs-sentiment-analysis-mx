@@ -26,6 +26,7 @@ def compute_and_save_mtl_metrics(
     """
     os.makedirs(results_dir, exist_ok=True)
 
+
     logits_polarity, logits_type, logits_town = predictions
     labels_polarity, labels_type, labels_town = labels
 
@@ -35,17 +36,28 @@ def compute_and_save_mtl_metrics(
 
     # --- Calculate Metrics ---
     metrics = {
+        # Polarity
         "polarity_weighted_f1": f1_score(labels_polarity, preds_polarity, average="weighted"),
+        "polarity_accuracy": accuracy_score(labels_polarity, preds_polarity),
+        "polarity_per_class_f1": f1_score(labels_polarity, preds_polarity, average=None).tolist(),
+        # Type
+        "type_weighted_f1": f1_score(labels_type, preds_type, average="weighted"),
         "type_accuracy": accuracy_score(labels_type, preds_type),
+        "type_per_class_f1": f1_score(labels_type, preds_type, average=None).tolist(),
+        # Town
+        "town_weighted_f1": f1_score(labels_town, preds_town, average="weighted"),
         "town_accuracy": accuracy_score(labels_town, preds_town),
-        "polarity_per_class_f1": f1_score(labels_polarity, preds_polarity, average=None).tolist()
+        "town_per_class_f1": f1_score(labels_town, preds_town, average=None).tolist(),
     }
 
     print(f"\n--- Final Metrics for run: {run_name} ---")
     print(f"  Polarity Weighted F1: {metrics['polarity_weighted_f1']:.4f}")
+    print(f"  Polarity Accuracy:    {metrics['polarity_accuracy']:.4f}")
+    print(f"  Type Weighted F1:     {metrics['type_weighted_f1']:.4f}")
     print(f"  Type Accuracy:        {metrics['type_accuracy']:.4f}")
+    print(f"  Town Weighted F1:     {metrics['town_weighted_f1']:.4f}")
     print(f"  Town Accuracy:        {metrics['town_accuracy']:.4f}")
-    
+
     # Save metrics to a JSON file
     metrics_path = os.path.join(results_dir, f"{run_name}_metrics.json")
     with open(metrics_path, 'w') as f:

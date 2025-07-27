@@ -146,13 +146,22 @@ def main(args):
         
         labels_polarity, labels_type, labels_town = p.label_ids
 
+        # F1 scores
         f1_polarity = f1_score(labels_polarity, preds_polarity, average="weighted")
+        f1_type = f1_score(labels_type, preds_type, average="weighted")
+        f1_town = f1_score(labels_town, preds_town, average="weighted")
+
+        # Accuracies
+        acc_polarity = accuracy_score(labels_polarity, preds_polarity)
         acc_type = accuracy_score(labels_type, preds_type)
         acc_town = accuracy_score(labels_town, preds_town)
-        
+
         return {
             "polarity_weighted_f1": f1_polarity,
+            "polarity_accuracy": acc_polarity,
+            "type_weighted_f1": f1_type,
             "type_accuracy": acc_type,
+            "town_weighted_f1": f1_town,
             "town_accuracy": acc_town,
         }
 
