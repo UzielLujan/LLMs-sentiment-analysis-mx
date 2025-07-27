@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 import wandb
-from datasets import Dataset, Features, ClassLabel, Value
+from datasets import Dataset, ClassLabel
 import transformers
 from transformers import (
     AutoTokenizer,
@@ -22,8 +22,8 @@ from sklearn.metrics import f1_score, accuracy_score
 
 # Import our custom modules
 from data_loader import load_and_prepare_dataset_for_mtl
-
-# --- 1. Custom Model for Multi-Task Learning ---
+from eval_utils_mtl import compute_and_save_mtl_metrics
+# --- Custom Model for Multi-Task Learning (no changes here) ---
 class MultiTaskModel(PreTrainedModel):
     def __init__(self, config, model_name, num_labels_polarity, num_labels_type, num_labels_town):
         super().__init__(config)
@@ -85,7 +85,7 @@ class MultiTaskModel(PreTrainedModel):
             "logits_town": logits_town,
         }
 
-# --- 2. Custom Trainer for Multi-Task Learning ---
+# --- Custom Trainer for Multi-Task Learning (no changes here) ---
 class MultiTaskTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         outputs = model(**inputs)
@@ -105,27 +105,6 @@ def main(args):
     eval_dataset = data['eval']
     label_mappings = data['label_mappings']
     
-    # --- CORRECCIÓN DEFINITIVA AQUÍ ---
-    # Forzamos explícitamente que las 3 columnas de etiquetas sean del tipo correcto.
-    # Esto resuelve el error "not implemented for 'Float'".
-    print("Casting label columns to correct data types...")
-    num_labels_polarity = len(label_mappings['polarity'])
-    num_labels_type = len(label_mappings['type'])
-    num_labels_town = len(label_mappings['town'])
-    
-    features = Features({
-        'text': Value('string'),
-        'polarity_label': ClassLabel(num_classes=num_labels_polarity),
-        'type_label': ClassLabel(num_classes=num_labels_type),
-        'town_label': ClassLabel(num_classes=num_labels_town),
-        # Añadir las columnas de tokenización para que no se pierdan
-        'input_ids': Value(dtype='int64'),
-        'token_type_ids': Value(dtype='int64'),
-        'attention_mask': Value(dtype='int64'),
-    })
-    
-    # --- FIN DE LA CORRECCIÓN ---
-
     print(f"Loading tokenizer for model: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
@@ -133,13 +112,19 @@ def main(args):
         return tokenizer(examples['text'], padding="max_length", truncation=True, max_length=args.max_length)
 
     print(f"Tokenizing datasets with max_length: {args.max_length}...")
-    # Tokenizamos primero, antes de hacer el cast
     train_dataset = train_dataset.map(tokenize_function, batched=True, remove_columns=['text'])
     eval_dataset = eval_dataset.map(tokenize_function, batched=True, remove_columns=['text'])
     
-    # Hacemos el cast después de tokenizar
-    train_dataset = train_dataset.cast(features)
-    eval_dataset = eval_dataset.cast(features)
+    # --- CORRECCIÓN DEFINITIVA AQUÍ ---
+    # En lugar de usar un objeto `Features` rígido, hacemos un cast
+    # individual de cada columna de etiquetas. Es más flexible y robusto.
+    print("Casting label columns to correct data types...")
+    for label_name, mapping in label_mappings.items():
+        num_classes = len(mapping)
+        class_label_feature = ClassLabel(num_classes=num_classes)
+        train_dataset = train_dataset.cast_column(f"{label_name}_label", class_label_feature)
+        eval_dataset = eval_dataset.cast_column(f"{label_name}_label", class_label_feature)
+    # --- FIN DE LA CORRECCIÓN ---
     
     print(f"Loading base model config: {args.model_name}")
     config = AutoConfig.from_pretrained(args.model_name)
@@ -148,9 +133,9 @@ def main(args):
     model = MultiTaskModel(
         config=config,
         model_name=args.model_name,
-        num_labels_polarity=num_labels_polarity,
-        num_labels_type=num_labels_type,
-        num_labels_town=num_labels_town
+        num_labels_polarity=len(label_mappings['polarity']),
+        num_labels_type=len(label_mappings['type']),
+        num_labels_town=len(label_mappings['town'])
     )
 
     def compute_metrics_mtl(p: EvalPrediction):
@@ -205,6 +190,13 @@ def main(args):
     print("\nEvaluating the best MTL model on the evaluation set...")
     final_predictions = trainer.predict(eval_dataset)
     
+    compute_and_save_mtl_metrics(
+        predictions=final_predictions.predictions,
+        labels=final_predictions.label_ids,
+        run_name=args.run_name,
+        label_mappings=label_mappings
+    )
+
     output_dir = os.path.join("models", args.run_name)
     trainer.save_model(output_dir)
     print(f"Final MTL model saved to {output_dir}")
@@ -224,4 +216,5 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     main(args)
+
 
