@@ -16,10 +16,10 @@
 set -e
 
 # --- Command-line Arguments ---
-# El modelo campeón
-MODEL_PATH=${1:-"models/BETO_MTL"} 
-# El nombre que le daremos a la carpeta de resultados
-RUN_NAME=${2:-"BETO_MTL_final_submission"} 
+MODEL_PATH=${1:?"Error: Debes especificar la ruta al modelo."} 
+RUN_NAME=${2:?"Error: Debes especificar un nombre para la ejecución."}
+# ¡NUEVO! Argumento para el tokenizer, con el de BETO como valor por defecto.
+TOKENIZER_PATH=${3:-"dccuchile/bert-base-spanish-wwm-cased"}
 
 # --- Create logs and submissions directories ---
 mkdir -p logs
@@ -34,20 +34,22 @@ echo "Working directory: $(pwd)"
 echo "---"
 echo "Model Path: $MODEL_PATH"
 echo "Run Name: $RUN_NAME"
+echo "Tokenizer Path: $TOKENIZER_PATH"
 echo "========================================================"
 
 # --- Conda Environment Activation & Job Execution ---
 export PATH="/opt/anaconda_python311/bin:$PATH"
 echo "Starting Python inference script..."
 
-# --- THE MAGIC LINE ---
-# Ejecutamos el script de inferencia con los parámetros adecuados
+# --- THE MAGIC LINE (ACTUALIZADA) ---
+# Ahora pasamos la ruta del tokenizer al script de inferencia.
 conda run -n llms-mx-env python src/inference.py \
     --model_path "$MODEL_PATH" \
+    --tokenizer_path "$TOKENIZER_PATH" \
     --test_file "data/Rest-Mex_2025_test.xlsx" \
     --output_dir "submissions/$RUN_NAME" \
     --max_length 256 \
-    --batch_size 64 # Podemos usar un batch size mayor en inferencia
+    --batch_size 64
 
 echo "========================================================"
 echo "Inference script finished."
