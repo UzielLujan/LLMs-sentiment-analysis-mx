@@ -18,12 +18,13 @@ from transformers import (
     PreTrainedModel,
     AutoConfig
 )
-from sklearn.metrics import f1_score, accuracy_score
+from sklearn.metrics import f1_score
 
 # Import our custom modules
 from data_loader import load_and_prepare_dataset_for_mtl
 from eval_utils_mtl import compute_and_save_mtl_metrics
-# --- Custom Model for Multi-Task Learning (no changes here) ---
+
+# --- Custom Model for Multi-Task Learning ---
 class MultiTaskModel(PreTrainedModel):
     def __init__(self, config, model_name, num_labels_polarity, num_labels_type, num_labels_town):
         super().__init__(config)
@@ -72,7 +73,10 @@ class MultiTaskModel(PreTrainedModel):
             loss_type = loss_fct(logits_type.view(-1, self.num_labels_type), type_label.view(-1))
             loss_town = loss_fct(logits_town.view(-1, self.num_labels_town), town_label.view(-1))
             
-            loss = (0.6 * loss_polarity) + (0.2 * loss_type) + (0.2 * loss_town)
+            # --- CAMBIO ESTRATÉGICO 1: PONDERACIÓN DE PÉRDIDA 2-1-3 ---
+            # Alineamos la pérdida con la fórmula de evaluación oficial.
+            # 3x para Town, 2x para Polarity, 1x para Type.
+            loss = (2 * loss_polarity + 1 * loss_type + 3 * loss_town) / 6.0
 
         if not return_dict:
             output = (logits_polarity, logits_type, logits_town) + outputs[2:]
@@ -115,16 +119,12 @@ def main(args):
     train_dataset = train_dataset.map(tokenize_function, batched=True, remove_columns=['text'])
     eval_dataset = eval_dataset.map(tokenize_function, batched=True, remove_columns=['text'])
     
-    # --- CORRECCIÓN DEFINITIVA AQUÍ ---
-    # En lugar de usar un objeto `Features` rígido, hacemos un cast
-    # individual de cada columna de etiquetas. Es más flexible y robusto.
     print("Casting label columns to correct data types...")
     for label_name, mapping in label_mappings.items():
         num_classes = len(mapping)
         class_label_feature = ClassLabel(num_classes=num_classes)
         train_dataset = train_dataset.cast_column(f"{label_name}_label", class_label_feature)
         eval_dataset = eval_dataset.cast_column(f"{label_name}_label", class_label_feature)
-    # --- FIN DE LA CORRECCIÓN ---
     
     print(f"Loading base model config: {args.model_name}")
     config = AutoConfig.from_pretrained(args.model_name)
@@ -146,23 +146,20 @@ def main(args):
         
         labels_polarity, labels_type, labels_town = p.label_ids
 
-        # F1 scores
+        # --- CAMBIO ESTRATÉGICO 2: CALCULAR EL "SCORE" OFICIAL ---
+        # Calculamos los F1-Scores ponderados para cada tarea.
         f1_polarity = f1_score(labels_polarity, preds_polarity, average="weighted")
         f1_type = f1_score(labels_type, preds_type, average="weighted")
         f1_town = f1_score(labels_town, preds_town, average="weighted")
-
-        # Accuracies
-        acc_polarity = accuracy_score(labels_polarity, preds_polarity)
-        acc_type = accuracy_score(labels_type, preds_type)
-        acc_town = accuracy_score(labels_town, preds_town)
+        
+        # Calculamos el Score final usando la ponderación oficial 2-1-3
+        final_score = (2 * f1_polarity + 1 * f1_type + 3 * f1_town) / 6.0
 
         return {
-            "polarity_weighted_f1": f1_polarity,
-            "polarity_accuracy": acc_polarity,
-            "type_weighted_f1": f1_type,
-            "type_accuracy": acc_type,
-            "town_weighted_f1": f1_town,
-            "town_accuracy": acc_town,
+            "Score": final_score, # La métrica principal a optimizar
+            "polarity_f1": f1_polarity,
+            "type_f1": f1_type,
+            "town_f1": f1_town,
         }
 
     training_args = TrainingArguments(
@@ -175,7 +172,8 @@ def main(args):
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
-        metric_for_best_model="polarity_weighted_f1",
+        # --- CAMBIO ESTRATÉGICO 3: OPTIMIZAR PARA EL "SCORE" ---
+        metric_for_best_model="Score",
         greater_is_better=True,
         save_total_limit=1,
         report_to="wandb" if args.use_wandb else "none",
@@ -199,6 +197,7 @@ def main(args):
     print("\nEvaluating the best MTL model on the evaluation set...")
     final_predictions = trainer.predict(eval_dataset)
     
+    # La función de guardado sigue siendo útil para el análisis post-entrenamiento
     compute_and_save_mtl_metrics(
         predictions=final_predictions.predictions,
         labels=final_predictions.label_ids,
@@ -210,7 +209,7 @@ def main(args):
     trainer.save_model(output_dir)
     print(f"Final MTL model saved to {output_dir}")
     
-    print(f"\n✅ Run '{args.run_name}' completed. Final metrics: {final_predictions.metrics}")
+    print(f"\n✅ Run '{args.run_name}' completed. Best metrics: {final_predictions.metrics}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a Multi-Task Transformer model.")
