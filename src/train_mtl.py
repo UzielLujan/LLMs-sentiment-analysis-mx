@@ -77,28 +77,38 @@ class MultiTaskModel(PreTrainedModel):
             loss = (2 * loss_polarity + 1 * loss_type + 3 * loss_town) / 6.0
 
         # --- ¡LA CORRECCIÓN ESTÁ AQUÍ! ---
-        # El Trainer espera un formato de salida específico (un tuple con la pérdida y los logits)
-        # cuando no se usa un diccionario. Hacemos que la salida sea explícita y robusta.
+        # El Trainer.predict espera una clave "logits". Empaquetamos nuestros 3 logits
+        # en una tupla bajo esa clave para máxima compatibilidad.
+        # El formato de diccionario es el más explícito y robusto.
         if not return_dict:
-            all_logits = (logits_polarity, logits_type, logits_town)
-            # Durante la predicción, la pérdida es None. El Trainer espera (None, logits_tuple).
-            # Durante el entrenamiento/evaluación, espera (loss, logits_tuple).
-            return (loss, all_logits) if loss is not None else (None, all_logits)
+            output = (logits_polarity, logits_type, logits_town)
+            return (loss, output) if loss is not None else (None, output)
 
-        # El formato de diccionario es más explícito y funciona bien con nuestro MultiTaskTrainer.
         return {
             "loss": loss,
-            "logits_polarity": logits_polarity,
-            "logits_type": logits_type,
-            "logits_town": logits_town,
+            "logits": (logits_polarity, logits_type, logits_town),
         }
 
-# --- Custom Trainer for Multi-Task Learning (no changes here) ---
+# --- Custom Trainer for Multi-Task Learning ---
+# ¡NUEVO! Hacemos el Trainer explícito para que siempre funcione.
 class MultiTaskTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         outputs = model(**inputs)
         loss = outputs["loss"]
         return (loss, outputs) if return_outputs else loss
+        
+    def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys=None):
+        inputs = self._prepare_inputs(inputs)
+        with torch.no_grad():
+            outputs = model(**inputs)
+            # Para la predicción, la pérdida será None, lo cual es correcto.
+            loss = outputs.get("loss")
+            # Los logits son la tupla que empaquetamos en el forward.
+            logits = outputs.get("logits")
+            # Las etiquetas se pasan por separado.
+            labels = tuple(inputs.get(name) for name in self.label_names)
+        return (loss, logits, labels)
+
 
 # --- El resto del archivo no necesita cambios ---
 def main(args):
@@ -141,6 +151,7 @@ def main(args):
     )
 
     def compute_metrics_mtl(p: EvalPrediction):
+        # p.predictions ahora contendrá la tupla de logits que empaquetamos.
         logits_polarity, logits_type, logits_town = p.predictions
         preds_polarity = np.argmax(logits_polarity, axis=1)
         preds_type = np.argmax(logits_type, axis=1)
@@ -177,6 +188,8 @@ def main(args):
         report_to="wandb" if args.use_wandb else "none",
         fp16=torch.cuda.is_available(),
         label_names=["polarity_label", "type_label", "town_label"],
+        # Aseguramos que el modelo siempre devuelva un diccionario para consistencia
+        remove_unused_columns=False, 
     )
 
     trainer = MultiTaskTrainer(
@@ -221,5 +234,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     main(args)
-
 

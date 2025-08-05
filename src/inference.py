@@ -5,8 +5,10 @@ import os
 import pandas as pd
 import torch
 import numpy as np
+from torch.utils.data import DataLoader
 from datasets import Dataset
-from transformers import AutoTokenizer, Trainer, TrainingArguments
+from transformers import AutoTokenizer
+from tqdm import tqdm
 
 # Importamos nuestros módulos personalizados
 from train_mtl import MultiTaskModel 
@@ -24,8 +26,12 @@ def main(args):
     data_info = load_and_prepare_dataset_for_mtl()
     label_mappings = data_info['label_mappings']
     
-    idx_to_town = {v: k for k, v in label_mappings['town'].items()}
-    idx_to_type = {v: k for k, v in label_mappings['type'].items()}
+    # --- ¡LA CORRECCIÓN ESTÁ AQUÍ! ---
+    # Usamos los diccionarios de mapeo directamente, sin invertirlos.
+    # El formato ya es {índice: nombre_etiqueta}.
+    idx_to_town = label_mappings['town']
+    idx_to_type = label_mappings['type']
+    # --- FIN DE LA CORRECCIÓN ---
 
     print(f"Cargando modelo pre-entrenado desde: {args.model_path}")
     model = MultiTaskModel.from_pretrained(
@@ -39,31 +45,46 @@ def main(args):
     print("Modelo y tokenizer cargados.")
 
     # --- 2. Cargar y Preparar Datos de Prueba ---
-    # Ahora simplemente llamamos a nuestra función dedicada.
     test_dataset = load_and_prepare_test_data(args.test_file)
     
     def tokenize_function(examples):
-        return tokenizer(examples['text'], padding="max_length", truncation=True, max_length=args.max_length)
+        return tokenizer(examples['text'], padding="max_length", truncation=True, max_length=args.max_length, return_tensors="pt")
 
     print("Tokenizando datos de prueba...")
-    tokenized_test_dataset = test_dataset.map(tokenize_function, batched=True, remove_columns=['text'])
+    # Guardamos los IDs originales antes de que el mapeo los elimine
+    original_ids = test_dataset['ID']
+    tokenized_test_dataset = test_dataset.map(tokenize_function, batched=True, remove_columns=['ID', 'text'])
+    tokenized_test_dataset.set_format('torch')
 
-    # --- 3. Realizar Predicciones ---
-    training_args = TrainingArguments(
-        output_dir="./temp_results",
-        per_device_eval_batch_size=args.batch_size,
-        do_predict=True,
-        fp16=torch.cuda.is_available(),
-    )
-    trainer = Trainer(model=model, args=training_args)
+    # --- 3. Bucle de Inferencia Manual ---
+    print("Realizando predicciones con bucle manual...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()
 
-    print("Realizando predicciones en el conjunto de prueba...")
-    predictions = trainer.predict(tokenized_test_dataset)
-    
-    logits_polarity, logits_type, logits_town = predictions.predictions
-    preds_polarity = np.argmax(logits_polarity, axis=1)
-    preds_type_idx = np.argmax(logits_type, axis=1)
-    preds_town_idx = np.argmax(logits_town, axis=1)
+    test_dataloader = DataLoader(tokenized_test_dataset, batch_size=args.batch_size)
+
+    all_preds_polarity = []
+    all_preds_type = []
+    all_preds_town = []
+
+    for batch in tqdm(test_dataloader, desc="Prediciendo"):
+        batch = {k: v.to(device) for k, v in batch.items()}
+        with torch.no_grad():
+            outputs = model(**batch)
+        
+        logits_polarity = outputs['logits'][0]
+        logits_type = outputs['logits'][1]
+        logits_town = outputs['logits'][2]
+
+        preds_polarity = torch.argmax(logits_polarity, dim=1).cpu().numpy()
+        preds_type = torch.argmax(logits_type, dim=1).cpu().numpy()
+        preds_town = torch.argmax(logits_town, dim=1).cpu().numpy()
+
+        all_preds_polarity.extend(preds_polarity)
+        all_preds_type.extend(preds_type)
+        all_preds_town.extend(preds_town)
+
     print("Predicciones generadas.")
 
     # --- 4. Generar Archivo de Salida Unificado ---
@@ -71,11 +92,14 @@ def main(args):
     output_file_path = os.path.join(args.output_dir, f"CorpusChristi_Run.txt")
     
     with open(output_file_path, "w", encoding="utf-8") as f:
-        for i in range(len(preds_polarity)):
-            instance_id = test_dataset[i]['ID']
-            polarity_pred = preds_polarity[i] + 1
-            town_pred = idx_to_town[preds_town_idx[i]]
-            type_pred = idx_to_type[preds_type_idx[i]]
+        for i in range(len(all_preds_polarity)):
+            # Usamos la lista de IDs que guardamos antes
+            instance_id = original_ids[i]
+            
+            polarity_pred = all_preds_polarity[i] + 1
+            town_pred = idx_to_town[all_preds_town[i]]
+            type_pred = idx_to_type[all_preds_type[i]]
+            
             output_line = f"rest-mex\t{instance_id}\t{polarity_pred}\t{town_pred}\t{type_pred}\n"
             f.write(output_line)
             
@@ -94,3 +118,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     main(args)
+
