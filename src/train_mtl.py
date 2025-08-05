@@ -26,6 +26,7 @@ from eval_utils_mtl import compute_and_save_mtl_metrics
 
 # --- Custom Model for Multi-Task Learning ---
 class MultiTaskModel(PreTrainedModel):
+    config_class = AutoConfig
     def __init__(self, config, model_name, num_labels_polarity, num_labels_type, num_labels_town):
         super().__init__(config)
         self.num_labels_polarity = num_labels_polarity

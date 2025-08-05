@@ -2,10 +2,9 @@
 
 # --- SLURM Configuration for Lab-SB (Inference on a Single GPU) ---
 #SBATCH --job-name=sentiment-inference-mx
-#SBATCH --partition=GPU
+#SBATCH --partition=GPU # La forma correcta de pedir un nodo con GPU en este clúster
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gpus-per-task=1 # La inferencia es menos intensiva, 1 GPU es suficiente
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=0
 #SBATCH --time=01:00:00 # 1 hora debería ser más que suficiente
@@ -18,8 +17,7 @@ set -e
 # --- Command-line Arguments ---
 MODEL_PATH=${1:?"Error: Debes especificar la ruta al modelo."} 
 RUN_NAME=${2:?"Error: Debes especificar un nombre para la ejecución."}
-# ¡NUEVO! Argumento para el tokenizer, con el de BETO como valor por defecto.
-TOKENIZER_PATH=${3:-"dccuchile/bert-base-spanish-wwm-cased"}
+TOKENIZER_PATH=${3:?"Error: Debes especificar la ruta al tokenizer."}
 
 # --- Create logs and submissions directories ---
 mkdir -p logs
@@ -41,8 +39,8 @@ echo "========================================================"
 export PATH="/opt/anaconda_python311/bin:$PATH"
 echo "Starting Python inference script..."
 
-# --- THE MAGIC LINE (ACTUALIZADA) ---
-# Ahora pasamos la ruta del tokenizer al script de inferencia.
+# --- THE MAGIC LINE ---
+# El script de python usará automáticamente la primera GPU que encuentre (cuda:0)
 conda run -n llms-mx-env python src/inference.py \
     --model_path "$MODEL_PATH" \
     --tokenizer_path "$TOKENIZER_PATH" \
