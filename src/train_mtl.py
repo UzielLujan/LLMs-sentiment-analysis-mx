@@ -27,6 +27,7 @@ from eval_utils_mtl import compute_and_save_mtl_metrics
 # --- Custom Model for Multi-Task Learning ---
 class MultiTaskModel(PreTrainedModel):
     config_class = AutoConfig
+    
     def __init__(self, config, model_name, num_labels_polarity, num_labels_type, num_labels_town):
         super().__init__(config)
         self.num_labels_polarity = num_labels_polarity
@@ -73,16 +74,18 @@ class MultiTaskModel(PreTrainedModel):
             loss_polarity = loss_fct(logits_polarity.view(-1, self.num_labels_polarity), polarity_label.view(-1))
             loss_type = loss_fct(logits_type.view(-1, self.num_labels_type), type_label.view(-1))
             loss_town = loss_fct(logits_town.view(-1, self.num_labels_town), town_label.view(-1))
-            
-            # --- CAMBIO ESTRATÉGICO 1: PONDERACIÓN DE PÉRDIDA 2-1-3 ---
-            # Alineamos la pérdida con la fórmula de evaluación oficial.
-            # 3x para Town, 2x para Polarity, 1x para Type.
             loss = (2 * loss_polarity + 1 * loss_type + 3 * loss_town) / 6.0
 
+        # --- ¡LA CORRECCIÓN ESTÁ AQUÍ! ---
+        # El Trainer espera un formato de salida específico (un tuple con la pérdida y los logits)
+        # cuando no se usa un diccionario. Hacemos que la salida sea explícita y robusta.
         if not return_dict:
-            output = (logits_polarity, logits_type, logits_town) + outputs[2:]
-            return ((loss,) + output) if loss is not None else output
+            all_logits = (logits_polarity, logits_type, logits_town)
+            # Durante la predicción, la pérdida es None. El Trainer espera (None, logits_tuple).
+            # Durante el entrenamiento/evaluación, espera (loss, logits_tuple).
+            return (loss, all_logits) if loss is not None else (None, all_logits)
 
+        # El formato de diccionario es más explícito y funciona bien con nuestro MultiTaskTrainer.
         return {
             "loss": loss,
             "logits_polarity": logits_polarity,
@@ -97,10 +100,8 @@ class MultiTaskTrainer(Trainer):
         loss = outputs["loss"]
         return (loss, outputs) if return_outputs else loss
 
+# --- El resto del archivo no necesita cambios ---
 def main(args):
-    """
-    Main function for the Multi-Task Learning pipeline.
-    """
     if args.use_wandb:
         wandb.init(project="LLMs-sentiment-analysis-mx", name=args.run_name, config=args)
 
@@ -147,17 +148,14 @@ def main(args):
         
         labels_polarity, labels_type, labels_town = p.label_ids
 
-        # --- CAMBIO ESTRATÉGICO 2: CALCULAR EL "SCORE" OFICIAL ---
-        # Calculamos los F1-Scores ponderados para cada tarea.
         f1_polarity = f1_score(labels_polarity, preds_polarity, average="weighted")
         f1_type = f1_score(labels_type, preds_type, average="weighted")
         f1_town = f1_score(labels_town, preds_town, average="weighted")
         
-        # Calculamos el Score final usando la ponderación oficial 2-1-3
         final_score = (2 * f1_polarity + 1 * f1_type + 3 * f1_town) / 6.0
 
         return {
-            "Score": final_score, # La métrica principal a optimizar
+            "Score": final_score,
             "polarity_f1": f1_polarity,
             "type_f1": f1_type,
             "town_f1": f1_town,
@@ -173,7 +171,6 @@ def main(args):
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
-        # --- CAMBIO ESTRATÉGICO 3: OPTIMIZAR PARA EL "SCORE" ---
         metric_for_best_model="Score",
         greater_is_better=True,
         save_total_limit=1,
@@ -198,7 +195,6 @@ def main(args):
     print("\nEvaluating the best MTL model on the evaluation set...")
     final_predictions = trainer.predict(eval_dataset)
     
-    # La función de guardado sigue siendo útil para el análisis post-entrenamiento
     compute_and_save_mtl_metrics(
         predictions=final_predictions.predictions,
         labels=final_predictions.label_ids,
