@@ -98,7 +98,7 @@ sbatch run\_prediction.sh "models/BETO\_MTL\_SO" "BETO\_final\_submission" "dccu
 
 El archivo CorpusChristi\_Run.txt se generará en la carpeta submissions/BETO\_final\_submission/.
 
-## **6\. Conclusión y Trabajo Futuro**
+## **6\. Conclusión **
 
 Este proyecto demuestra el poder del Aprendizaje Multitarea y, de forma más crítica, la importancia de **alinear los objetivos de entrenamiento con las métricas de evaluación específicas**. Esta alineación fue la clave que desbloqueó el máximo potencial del modelo.
 

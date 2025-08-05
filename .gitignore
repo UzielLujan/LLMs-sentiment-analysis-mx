@@ -29,9 +29,13 @@ models/
 *.bin
 *.h5
 
-# Logs and results
+
+# Logs
 logs/
-results/
+
+# Results: allow only .json files in results/
+results/*
+!results/*.json
 
 # Paquetes de Python
 *.egg-info/
