@@ -9,7 +9,7 @@ El objetivo principal fue mejorar el desempeño en la clasificación de **Polari
 La contribución estratégica clave del proyecto fue la implementación de una función de pérdida alineada con la métrica de evaluación oficial de la competencia. Este pivote estratégico, denominado **"Score-Optimized" (SO)**, resultó en un salto de rendimiento notable para esta tarea con el modelo **BETO (MTL-SO)**, que alcanzó un **Score oficial de 0.7822**.
 
 ## **2\. Estructura del Proyecto**
-
+```bash
 LLMs-sentiment-analysis-mx/  
 ├── data/               \# Contiene los datasets de entrenamiento y prueba  
 ├── notebooks/          \# Jupyter notebooks para EDA y prototipado inicial  
@@ -26,7 +26,7 @@ LLMs-sentiment-analysis-mx/
 ├── requirements.txt    \# Dependencias del proyecto  
 ├── README.md           \# Este archivo  
 └── run\_\*.sh            \# Scripts de lanzamiento para el clúster SLURM
-
+```
 **Nota sobre los Scripts de Lanzamiento:** Los scripts run\_\*.sh se encuentran intencionadamente en la raíz del proyecto. Nuestra extensa depuración en el clúster SLURM de CIMAT demostró que esta es la forma más robusta de evitar problemas complejos de rutas relativas, garantizando un flujo de trabajo estable y reproducible.
 
 ## **3\. Metodología y Evolución Estratégica**
