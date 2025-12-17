@@ -1,106 +1,108 @@
-# **Análisis de Sentimientos para Turismo Mexicano con Aprendizaje Multitarea**
+# **Sentiment Analysis for Mexican Tourism with Multi-Task Learning**
 
-## **1\. Resumen**
+## **1. Summary**
 
-Este repositorio documenta un proyecto avanzado de análisis de sentimientos sobre reseñas de turismo en México, desarrollado originalmente para la competencia REST-MEX 2025\. El proyecto evoluciona a partir de un enfoque de clasificación de tarea única (single-task) a un pipeline de **Aprendizaje Multitarea (Multi-Task Learning \- MTL)** robusto, modular y optimizado para su ejecución en clústeres de supercómputo.
+This repository documents an advanced sentiment analysis project on tourism reviews in Mexico, originally developed for the REST-MEX 2025 competition. The project evolves from a single-task classification approach to a robust, modular, and optimized **Multi-Task Learning (MTL)** pipeline designed for execution on supercomputing clusters.
 
-El objetivo principal fue mejorar el desempeño en la clasificación de **Polaridad** (sentimiento) forzando a modelos Transformer (BETO y MarIA) a aprender simultáneamente dos tareas auxiliares: la predicción del **Tipo** de establecimiento en el que fue emitida la reseña (Type) y la identificación del **Pueblo Mágico** (Town). La hipótesis central, validada con éxito, fue que este enfoque multitarea proporcionaría un contexto más rico, mejorando el rendimiento en todas las tareas.
+The main objective was to improve performance in **Polarity** (sentiment) classification by forcing Transformer models (BETO and MarIA) to simultaneously learn two auxiliary tasks: predicting the **Type** of establishment where the review was made (Type) and identifying the **Magical Town** (Town). The central hypothesis, successfully validated, was that this multitask approach would provide richer context, improving performance across all tasks.
 
-La contribución estratégica clave del proyecto fue la implementación de una función de pérdida alineada con la métrica de evaluación oficial de la competencia. Este pivote estratégico, denominado **"Score-Optimized" (SO)**, resultó en un salto de rendimiento notable para esta tarea con el modelo **BETO (MTL-SO)**, que alcanzó un **Score oficial de 0.7822**.
+The key strategic contribution of the project was the implementation of a loss function aligned with the competition's official evaluation metric. This strategic pivot, called **"Score-Optimized" (SO)**, resulted in a remarkable performance boost for this task with the **BETO (MTL-SO)** model, achieving an **official Score of 0.7822**.
 
-## **2\. Estructura del Proyecto**
+## **2. Project Structure**
 ```bash
 LLMs-sentiment-analysis-mx/  
-├── data/               \# Contiene los datasets de entrenamiento y prueba  
-├── notebooks/          \# Jupyter notebooks para EDA y prototipado inicial  
-├── src/                \# Código fuente modular del pipeline  
-│   ├── data\_loader.py  
-│   ├── load\_test.py  
-│   ├── train\_mtl.py  
-│   ├── eval\_utils\_mtl.py  
+├── data/               # Contains training and test datasets  
+├── notebooks/          # Jupyter notebooks for EDA and initial prototyping  
+├── src/                # Modular pipeline source code  
+│   ├── data_loader.py  
+│   ├── load_test.py  
+│   ├── train_mtl.py  
+│   ├── eval_utils_mtl.py  
 │   └── inference.py  
-├── models/             \# Checkpoints de los modelos guardados (ignorado por Git)  
-├── results/            \# Métricas y matrices de confusión (ignorado por Git)  
-├── submissions/        \# Archivos .txt de predicción finales (ignorado por Git)  
+├── models/             # Saved model checkpoints (ignored by Git)  
+├── results/            # Metrics and confusion matrices (ignored by Git)  
+├── submissions/        # Final prediction .txt files (ignored by Git)  
 ├── .gitignore  
-├── requirements.txt    \# Dependencias del proyecto  
-├── README.md           \# Este archivo  
-└── run\_\*.sh            \# Scripts de lanzamiento para el clúster SLURM
+├── requirements.txt    # Project dependencies  
+├── README.md           # This file  
+└── run_*.sh            # Launch scripts for the SLURM cluster
 ```
-**Nota sobre los Scripts de Lanzamiento:** Los scripts run\_\*.sh se encuentran intencionadamente en la raíz del proyecto. Nuestra extensa depuración en el clúster SLURM de CIMAT demostró que esta es la forma más robusta de evitar problemas complejos de rutas relativas, garantizando un flujo de trabajo estable y reproducible.
+**Note on Launch Scripts:** The run_*.sh scripts are intentionally placed at the root of the project. Extensive debugging on the CIMAT SLURM cluster demonstrated that this is the most robust way to avoid complex relative path issues, ensuring a stable and reproducible workflow.
 
-## **3\. Metodología y Evolución Estratégica**
+## **3. Methodology and Strategic Evolution**
 
-El proyecto se abordó como una serie de experimentos iterativos, cada uno construido sobre los aprendizajes del anterior.
+The project was approached as a series of iterative experiments, each building on the lessons of the previous one.
 
-### **Fase 1: Baselines y Optimización del Pipeline**
+### **Phase 1: Baselines and Pipeline Optimization**
 
-* **Modelos Base:** Se establecieron baselines con **BETO** (dccuchile/bert-base-spanish-wwm-cased) y **MarIA** (BSC-TeMU/roberta-base-bne) en un enfoque de tarea única.  
-* **Optimización para HPC:** Se construyó un pipeline modular y se optimizó para el clúster Lab-SB de CIMAT, resolviendo numerosos desafíos de entorno y dependencias.  
-* **Entrenamiento Distribuido:** Se implementó torchrun con Distributed Data Parallel (DDP) para entrenar en 2 GPUs, logrando una **aceleración de \~3x** (de \~1.5 horas a \~30 minutos por ejecución).
+* **Base Models:** Baselines were established with **BETO** (dccuchile/bert-base-spanish-wwm-cased) and **MarIA** (BSC-TeMU/roberta-base-bne) in a single-task approach.  
+* **Optimization for HPC:** A modular pipeline was built and optimized for the CIMAT Lab-SB cluster, resolving numerous environment and dependency challenges.  
+* **Distributed Training:** torchrun with Distributed Data Parallel (DDP) was implemented to train on 2 GPUs, achieving a **~3x speedup** (from ~1.5 hours to ~30 minutes per run).
 
-### **Fase 2: El Salto al Aprendizaje Multitarea (MTL)**
+### **Phase 2: The Leap to Multi-Task Learning (MTL)**
 
-* **Hipótesis:** Entrenar para las tres tareas (Polarity, Type, Town) simultáneamente mejoraría el rendimiento.  
-* **Implementación:** Se desarrolló un MultiTaskModel con tres cabezas de clasificación. La función de pérdida inicial se enfocó en Polarity.  
-* **Resultado:** Éxito rotundo. El F1-Score de Polaridad saltó de \~0.73 a **\~0.765**, validando la estrategia MTL.
+* **Hypothesis:** Training for all three tasks (Polarity, Type, Town) simultaneously would improve performance.  
+* **Implementation:** A MultiTaskModel with three classification heads was developed. The initial loss function focused on Polarity.  
+* **Result:** Resounding success. The Polarity F1-Score jumped from ~0.73 to **~0.765**, validating the MTL strategy.
 
-### **Fase 3: El Pivote Estratégico (Score-Optimized)**
+### **Phase 3: The Strategic Pivot (Score-Optimized)**
 
-* El Descubrimiento: Un análisis detallado de la documentación de la competencia reveló que la métrica de evaluación final no era el F1 de Polaridad, sino un "Score" ponderado:  
-  Score=62×F1polarity​+1×F1type​+3×F1town​​  
-* **La Nueva Hipótesis:** Alinear la función de pérdida del entrenamiento con esta fórmula debería maximizar el Score final.  
-* **Implementación Final:** Se modificó la función de pérdida en train\_mtl.py para reflejar la ponderación 2-1-3 y se ajustó la métrica de optimización del Trainer para que guardara el checkpoint con el Score más alto.
+* **The Discovery:** A detailed analysis of the competition documentation revealed that the final evaluation metric was not the Polarity F1 but a weighted "Score":  
+  ```
+  Score = 62×F1polarity + 1×F1type + 3×F1town
+  ```
+* **The New Hypothesis:** Aligning the training loss function with this formula should maximize the final Score.  
+* **Final Implementation:** The loss function in train_mtl.py was modified to reflect the 62-1-3 weighting, and the Trainer's optimization metric was adjusted to save the checkpoint with the highest Score.
 
-## **4\. Resultados Finales**
+## **4. Final Results**
 
-La estrategia "Score-Optimized" (SO) fue decisiva y reveló a **BETO** como el campeón indiscutible.
+The "Score-Optimized" (SO) strategy was decisive and revealed **BETO** as the undisputed champion.
 
-| Modelo | Estrategia | F1 Polarity | F1 Type | F1 Town | Score Oficial |
+| Model | Strategy | F1 Polarity | F1 Type | F1 Town | Official Score |
 | :---- | :---- | :---- | :---- | :---- | :---- |
-| BETO (MTL) | Foco en Polaridad | 0.7656 | 0.9770 | 0.6894 | 0.7627 |
+| BETO (MTL) | Focus on Polarity | 0.7656 | 0.9770 | 0.6894 | 0.7627 |
 | **BETO (MTL-SO)** | **Score-Optimized** | 0.7592 | 0.9782 | **0.7322** | **0.7822 (+0.0195)** |
 
-El modelo SO sacrificó inteligentemente un rendimiento mínimo en Polarity para lograr una ganancia masiva en Town, la tarea más valiosa, lo que resultó en un aumento drástico del Score global.
+The SO model intelligently sacrificed minimal performance in Polarity to achieve massive gains in Town, the most valuable task, resulting in a drastic increase in the overall Score.
 
-## **5\. Uso e Instrucciones**
+## **5. Usage and Instructions**
 
-### **5.1. Configuración del Entorno**
+### **5.1. Environment Setup**
 
-Se recomienda usar conda para gestionar el entorno.
+Using conda to manage the environment is recommended.
 
-\# 1\. Clonar el repositorio  
-git clone \[https://github.com/UzielLujan/LLMs-sentiment-analysis-mx.git\](https://github.com/UzielLujan/LLMs-sentiment-analysis-mx.git)  
+# 1. Clone the repository  
+git clone [https://github.com/UzielLujan/LLMs-sentiment-analysis-mx.git](https://github.com/UzielLujan/LLMs-sentiment-analysis-mx.git)  
 cd LLMs-sentiment-analysis-mx
 
-\# 2\. Crear y activar el entorno  
-conda create \--name llms-mx-env python=3.10  
+# 2. Create and activate the environment  
+conda create --name llms-mx-env python=3.10  
 conda activate llms-mx-env
 
-\# 3\. Instalar dependencias  
-pip install \-r requirements.txt  
-\# (Opcional, para GPU local)  
-\# conda install pytorch torchvision torchaudio pytorch-cuda=12.1 \-c pytorch \-c nvidia
+# 3. Install dependencies  
+pip install -r requirements.txt  
+# (Optional, for local GPU)  
+# conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
 
-**Nota:** Para el clúster de CIMAT, se requiere una instalación manual más detallada de las librerías.
+**Note:** For the CIMAT cluster, a more detailed manual installation of libraries is required.
 
-### **5.2. Entrenamiento en el Clúster**
+### **5.2. Training on the Cluster**
 
-Para lanzar un entrenamiento optimizado para el Score con BETO durante 6 épocas:
+To launch Score-optimized training with BETO for 6 epochs:
 
-sbatch run\_mtl\_2gpu.sh "models/BETO\_local" "BETO\_MTL\_SO\_final" 6
+sbatch run_mtl_2gpu.sh "models/BETO_local" "BETO_MTL_SO_final" 6
 
-### **5.3. Inferencia**
+### **5.3. Inference**
 
-Para generar el archivo de predicciones con el modelo campeón (BETO\_MTL\_SO):
+To generate the prediction file with the champion model (BETO_MTL_SO):
 
-sbatch run\_prediction.sh "models/BETO\_MTL\_SO" "BETO\_final\_submission" "dccuchile/bert-base-spanish-wwm-cased"
+sbatch run_prediction.sh "models/BETO_MTL_SO" "BETO_final_submission" "dccuchile/bert-base-spanish-wwm-cased"
 
-El archivo CorpusChristi\_Run.txt se generará en la carpeta submissions/BETO\_final\_submission/.
+The CorpusChristi_Run.txt file will be generated in the submissions/BETO_final_submission/ folder.
 
-## **6\. Conclusión**
+## **6. Conclusion**
 
-Este proyecto demuestra el poder del Aprendizaje Multitarea y, de forma más crítica, la importancia de **alinear los objetivos de entrenamiento con las métricas de evaluación específicas**. Esta alineación fue la clave que desbloqueó el máximo potencial del modelo.
+This project demonstrates the power of Multi-Task Learning and, more critically, the importance of **aligning training objectives with specific evaluation metrics**. This alignment was the key that unlocked the model's full potential.
 
 Uziel Isaí Lujan López — M.Sc. in Statistical Computing at CIMAT  
 [LinkedIn](https://www.linkedin.com/in/uziel-lujan/) | [GitHub](https://github.com/UzielLujan)
