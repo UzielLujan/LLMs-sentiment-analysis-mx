@@ -8,7 +8,8 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=0
 #SBATCH --time=08:00:00
-#SBATCH --output=logs/%x-%j.log  # This path is now correct because we run from the root
+#SBATCH --chdir=/home/est_posgrado_uziel.lujan/LLMs-sentiment-analysis-mx # <-- AÑADIR ESTA LÍNEA
+#SBATCH --output=logs/%x-%j.log
 
 # --- Best Practices ---
 set -e

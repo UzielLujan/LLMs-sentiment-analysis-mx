@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # --- SLURM Configuration for Lab-SB (Multi-GPU with DDP) ---
 #SBATCH --job-name=sentiment-analysis-mx
 #SBATCH --partition=GPU
